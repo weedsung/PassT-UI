@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>PassT - 원패스 통합 모빌리티</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap');
+        
+        body {
+            font-family: 'Noto Sans KR', -apple-system, sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+        }
+        
+        #app {
+            max-width: 420px;
+            margin: 0 auto;
+            background: #3B444A;
+        }
+        
+        .dark-section {
+            background: #3B444A;
+            min-height: 50vh;
+        }
+        
+        .light-section {
+            background: #E8F5EE;
+            border-radius: 30px 30px 0 0;
+            margin-top: -20px;
+        }
+        
+        .transport-card {
+            background: linear-gradient(135deg, #1BCB6B 0%, #52D988 100%);
+        }
+        
+        .mode-button {
+            background-color: white;
+            transition: all 0.3s ease;
+            aspect-ratio: 1;
+        }
+        
+        .mode-button.selected {
+            background-color: #1BCB6B;
+            color: white;
+            box-shadow: 0 4px 12px rgba(27, 203, 107, 0.3);
+            transform: scale(1.05);
+        }
+        
+        .mode-button:not(.selected) {
+            color: #6B7280;
+        }
+        
+        .logo-text-pass {
+            fill: #1BCB6B;
+        }
+        
+        .action-btn-primary {
+            background-color: #1BCB6B;
+        }
+        
+        .pay-button {
+            background: linear-gradient(135deg, #1BCB6B 0%, #52D988 100%);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .pay-button::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.5);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+        
+        .pay-button:active::before {
+            width: 300px;
+            height: 300px;
+        }
+        
+        @keyframes cardActivate {
+            0%, 100% { transform: translateX(0) scale(1); }
+            10% { transform: translateX(-3px) scale(1.02); }
+            20% { transform: translateX(3px) scale(1.02); }
+            30% { transform: translateX(-3px) scale(1.02); }
+            40% { transform: translateX(3px) scale(1.02); }
+            50% { transform: translateX(-2px) scale(1.02); }
+            60% { transform: translateX(2px) scale(1.02); }
+            70% { transform: translateX(-1px) scale(1.01); }
+            80% { transform: translateX(1px) scale(1.01); }
+            90% { transform: translateX(0) scale(1.01); }
+        }
+        
+        @keyframes cardGlowContinuous {
+            0%, 100% { 
+                box-shadow: 0 20px 40px rgba(27, 203, 107, 0.4),
+                            0 0 30px rgba(27, 203, 107, 0.3); 
+            }
+            50% { 
+                box-shadow: 0 0 50px rgba(27, 203, 107, 0.8), 
+                            0 0 80px rgba(27, 203, 107, 0.5),
+                            0 0 100px rgba(27, 203, 107, 0.3); 
+            }
+        }
+        
+        .card-activated {
+            animation: cardActivate 0.6s ease-in-out, cardGlowContinuous 2s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        .payment-active-indicator {
+            animation: pulse 1s ease-in-out infinite;
+        }
+        
+        /* Popup Styles */
+        .popup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            z-index: 1000;
+            animation: fadeIn 0.3s ease-out;
+        }
+        
+        .popup-overlay.active {
+            display: block;
+        }
+        
+        .popup-content {
+            position: fixed;
+            bottom: -100%;
+            left: 0;
+            right: 0;
+            max-width: 420px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 24px 24px 0 0;
+            padding: 24px;
+            transition: bottom 0.3s ease-out;
+            z-index: 1001;
+        }
+        
+        .popup-overlay.active .popup-content {
+            bottom: 0;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .popup-handle {
+            width: 40px;
+            height: 4px;
+            background: #D1D5DB;
+            border-radius: 2px;
+            margin: 0 auto 20px;
+        }
+    </style>
+</head>
+<body class="transition-colors duration-500">
+    <div id="app" class="min-h-screen flex flex-col">
+        <!-- Dark Top Section (Header + Card) -->
+        <div class="dark-section px-5 py-6 pb-12">
+            <!-- Header with Logo -->
+            <div class="w-full mb-8">
+                <div class="flex items-center justify-between">
+                    <div class="flex flex-col">
+                        <!-- PassT Logo SVG -->
+                        <svg width="120" height="40" viewBox="0 0 200 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <!-- Pass (Green) -->
+                            <text x="0" y="60" font-family="Noto Sans KR, sans-serif" font-size="60" font-weight="800" fill="#1BCB6B" letter-spacing="-2">Pass</text>
+                            <!-- T (Purple to Orange gradient) - 붙여서 -->
+                            <defs>
+                                <linearGradient id="tGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                    <stop offset="0%" style="stop-color:#9B2C9B;stop-opacity:1" />
+                                    <stop offset="100%" style="stop-color:#FF9500;stop-opacity:1" />
+                                </linearGradient>
+                            </defs>
+                            <text x="133" y="60" font-family="Noto Sans KR, sans-serif" font-size="60" font-weight="800" fill="url(#tGradient)">T</text>
+                        </svg>
+                        <p class="text-xs text-white/80" style="margin-left: 11px;">지쿠터 - 원패스 통합 모빌리티 교통 패스</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Transit Card -->
+            <div class="w-full">
+                <div class="transport-card text-white p-7 rounded-3xl shadow-2xl relative overflow-hidden">
+                    <div class="relative z-10">
+                        <!-- Card Header -->
+                        <div class="flex justify-between items-start mb-7">
+                            <div>
+                                <p class="text-sm font-medium opacity-90">PassT</p>
+                                <p class="text-xl font-bold mt-0.5">One-Pass</p>
+                            </div>
+                            <div class="bg-white/20 p-2.5 rounded-xl backdrop-blur-sm">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
+                                    <path d="M12 18h.01"/>
+                                </svg>
+                            </div>
+                        </div>
+                        
+                        <!-- Card Number -->
+                        <p class="font-mono text-base tracking-widest mb-8 opacity-95">●●●● ●●●● ●●●● 4892</p>
+                        
+                        <!-- Balance and Expiry -->
+                        <div class="flex justify-between items-end">
+                            <div>
+                                <p class="text-xs opacity-85 mb-1.5 font-medium">잔액</p>
+                                <p class="text-4xl font-bold tracking-tight">24.300원</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-xs opacity-85 mb-1.5 font-medium">유효기간</p>
+                                <p class="text-xl font-semibold">12/10</p>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Decorative Elements -->
+                    <div class="absolute -top-20 -right-20 w-56 h-56 bg-white/10 rounded-full blur-3xl"></div>
+                    <div class="absolute -bottom-16 -left-16 w-48 h-48 bg-white/10 rounded-full blur-2xl"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Light Bottom Section (Transport Modes + Actions) -->
+        <div class="light-section flex-1 px-5 py-8">
+            <!-- Transport Mode Selection -->
+            <div class="w-full mb-6">
+                <p class="text-sm mb-4 text-gray-600 text-center font-medium">이동 수단을 선택하세요</p>
+                <div id="transport-modes" class="grid grid-cols-4 gap-3">
+                <button data-mode="scooter" class="mode-button selected flex flex-col items-center justify-center p-3 rounded-2xl transition-all">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mb-1.5">
+                        <circle cx="18" cy="18" r="3"/>
+                        <circle cx="6" cy="18" r="3"/>
+                        <path d="M11 14h4"/>
+                        <path d="M14 14h-1.13a3 3 0 0 1-2.68-1.66L7.28 6.73A2 2 0 0 0 5.5 5.5H3"/>
+                        <path d="M15 6h3.5a2 2 0 0 1 1.68 3.16l-3.5 5.34"/>
+                    </svg>
+                    <span class="text-[10px] font-semibold">전동킥보드</span>
+                </button>
+                    <button data-mode="subway" class="mode-button flex flex-col items-center justify-center p-3 rounded-2xl transition-all">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mb-1.5">
+                            <rect x="3" y="3" width="18" height="18" rx="2"/>
+                            <path d="M7 8h10"/>
+                            <path d="M7 12h10"/>
+                            <path d="M7 16h10"/>
+                        </svg>
+                        <span class="text-[10px] font-semibold">지하철</span>
+                    </button>
+                    <button data-mode="bus" class="mode-button flex flex-col items-center justify-center p-3 rounded-2xl transition-all">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mb-1.5">
+                            <path d="M8 6v6"/>
+                            <path d="M15 6v6"/>
+                            <path d="M2 12h19.6"/>
+                            <path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3"/>
+                            <circle cx="7" cy="18" r="2"/>
+                            <circle cx="17" cy="18" r="2"/>
+                        </svg>
+                        <span class="text-[10px] font-semibold">버스</span>
+                    </button>
+                    <button data-mode="bike" class="mode-button flex flex-col items-center justify-center p-3 rounded-2xl transition-all">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mb-1.5">
+                            <circle cx="18.5" cy="17.5" r="3.5"/>
+                            <circle cx="5.5" cy="17.5" r="3.5"/>
+                            <circle cx="15" cy="5" r="1"/>
+                            <path d="M12 17.5V14l-3-3 4-3 2 3h2"/>
+                        </svg>
+                        <span class="text-[10px] font-semibold">자전거</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Payment Button (Large) -->
+            <div class="w-full mb-4">
+                <button id="pay-button" class="pay-button w-full py-4 rounded-2xl text-white shadow-xl hover:shadow-2xl transition-all font-semibold text-sm">
+                    결제하기
+                </button>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="w-full flex gap-3">
+                <button id="history-btn" class="flex-1 py-4 rounded-2xl bg-white shadow-sm hover:shadow-md transition-all font-semibold text-sm" style="color: #1BCB6B;">
+                    이용 내역
+                </button>
+                <button id="charge-btn" class="action-btn-primary flex-1 py-4 rounded-2xl text-white shadow-lg hover:shadow-xl transition-all font-semibold text-sm">
+                    충전하기
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 이용 내역 Popup -->
+    <div id="history-popup" class="popup-overlay">
+        <div class="popup-content">
+            <div class="popup-handle"></div>
+            <h2 class="text-xl font-bold mb-4" style="color: #1BCB6B;">이용 내역</h2>
+            <div class="space-y-3">
+                <div class="flex justify-between items-center p-4 bg-gray-50 rounded-xl">
+                    <div>
+                        <p class="font-semibold text-gray-800">전동킥보드</p>
+                        <p class="text-xs text-gray-500">2024.12.09 14:32</p>
+                    </div>
+                    <p class="font-bold text-gray-800">-2,500원</p>
+                </div>
+                <div class="flex justify-between items-center p-4 bg-gray-50 rounded-xl">
+                    <div>
+                        <p class="font-semibold text-gray-800">지하철</p>
+                        <p class="text-xs text-gray-500">2024.12.09 09:15</p>
+                    </div>
+                    <p class="font-bold text-gray-800">-1,400원</p>
+                </div>
+                <div class="flex justify-between items-center p-4 bg-gray-50 rounded-xl">
+                    <div>
+                        <p class="font-semibold text-gray-800">버스</p>
+                        <p class="text-xs text-gray-500">2024.12.08 18:45</p>
+                    </div>
+                    <p class="font-bold text-gray-800">-1,200원</p>
+                </div>
+            </div>
+            <button class="close-popup w-full mt-6 py-4 rounded-2xl bg-gray-200 font-semibold text-sm text-gray-700">
+                닫기
+            </button>
+        </div>
+    </div>
+
+    <!-- 충전하기 Popup -->
+    <div id="charge-popup" class="popup-overlay">
+        <div class="popup-content">
+            <div class="popup-handle"></div>
+            <h2 class="text-xl font-bold mb-4" style="color: #1BCB6B;">충전하기</h2>
+            <div class="space-y-3 mb-6">
+                <button class="charge-option w-full p-4 bg-gray-50 hover:bg-green-50 rounded-xl text-left transition-all">
+                    <p class="font-bold text-gray-800 text-lg">10,000원</p>
+                </button>
+                <button class="charge-option w-full p-4 bg-gray-50 hover:bg-green-50 rounded-xl text-left transition-all">
+                    <p class="font-bold text-gray-800 text-lg">30,000원</p>
+                </button>
+                <button class="charge-option w-full p-4 bg-gray-50 hover:bg-green-50 rounded-xl text-left transition-all">
+                    <p class="font-bold text-gray-800 text-lg">50,000원</p>
+                </button>
+                <button class="charge-option w-full p-4 bg-gray-50 hover:bg-green-50 rounded-xl text-left transition-all">
+                    <p class="font-bold text-gray-800 text-lg">100,000원</p>
+                </button>
+            </div>
+            <button class="close-popup w-full py-4 rounded-2xl bg-gray-200 font-semibold text-sm text-gray-700">
+                닫기
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const app = document.getElementById('app');
+        const transportModesContainer = document.getElementById('transport-modes');
+        const payButton = document.getElementById('pay-button');
+        const card = document.querySelector('.transport-card');
+        let isPaymentActive = false;
+        let paymentIndicator = null;
+
+        // Popup elements
+        const historyBtn = document.getElementById('history-btn');
+        const chargeBtn = document.getElementById('charge-btn');
+        const historyPopup = document.getElementById('history-popup');
+        const chargePopup = document.getElementById('charge-popup');
+        const closeButtons = document.querySelectorAll('.close-popup');
+
+        // Payment button toggle (on/off)
+        payButton.addEventListener('click', () => {
+            if (isPaymentActive) {
+                // OFF: 결제 모드 비활성화
+                isPaymentActive = false;
+                
+                // 카드 애니메이션 제거
+                card.classList.remove('card-activated');
+                
+                // 버튼 텍스트 및 색상 복구
+                payButton.innerHTML = '결제하기';
+                payButton.style.background = 'linear-gradient(135deg, #1BCB6B 0%, #52D988 100%)';
+                
+                // 활성화 표시 제거
+                if (paymentIndicator && paymentIndicator.parentNode) {
+                    paymentIndicator.remove();
+                    paymentIndicator = null;
+                }
+            } else {
+                // ON: 결제 모드 활성화
+                isPaymentActive = true;
+                
+                // 진동 패턴 (지원하는 기기에서)
+                if ('vibrate' in navigator) {
+                    // 웅웅 패턴: [진동ms, 멈춤ms, 진동ms, ...]
+                    navigator.vibrate([100, 50, 100, 50, 100, 50, 200]);
+                }
+                
+                // 카드 활성화 애니메이션
+                card.classList.add('card-activated');
+                
+                // 버튼 텍스트 변경
+                payButton.innerHTML = '✓ 결제 준비 완료';
+                payButton.style.background = 'linear-gradient(135deg, #10B759 0%, #3DD684 100%)';
+                
+                // 카드에 활성화 표시 추가
+                paymentIndicator = document.createElement('div');
+                paymentIndicator.className = 'payment-active-indicator absolute top-4 right-4 w-3 h-3 bg-white rounded-full';
+                paymentIndicator.style.zIndex = '20';
+                card.appendChild(paymentIndicator);
+            }
+        });
+
+        // Open popups
+        historyBtn.addEventListener('click', () => {
+            historyPopup.classList.add('active');
+        });
+
+        chargeBtn.addEventListener('click', () => {
+            chargePopup.classList.add('active');
+        });
+
+        // Close popups
+        closeButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                historyPopup.classList.remove('active');
+                chargePopup.classList.remove('active');
+            });
+        });
+
+        // Close popup when clicking overlay
+        historyPopup.addEventListener('click', (e) => {
+            if (e.target === historyPopup) {
+                historyPopup.classList.remove('active');
+            }
+        });
+
+        chargePopup.addEventListener('click', (e) => {
+            if (e.target === chargePopup) {
+                chargePopup.classList.remove('active');
+            }
+        });
+
+        // Charge option click (목업용)
+        document.querySelectorAll('.charge-option').forEach(btn => {
+            btn.addEventListener('click', () => {
+                alert('충전 기능은 목업입니다.');
+                chargePopup.classList.remove('active');
+            });
+        });
+
+        // Transport mode selection
+        transportModesContainer.addEventListener('click', (e) => {
+            const button = e.target.closest('.mode-button');
+            if (button) {
+                const selectedButton = transportModesContainer.querySelector('.selected');
+                if (selectedButton) {
+                    selectedButton.classList.remove('selected');
+                }
+                button.classList.add('selected');
+            }
+        });
+    </script>
+</body>
+</html>
+  
